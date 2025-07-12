@@ -32,6 +32,12 @@ else
     converter_menu.add_item("Debug Context") {
       ImageToGeometryConverter.debug_context
     }
+
+    converter_menu.add_separator
+
+    converter_menu.add_item("Run Diagnostics") {
+      ImageToGeometryConverter.run_diagnostics
+    }
     
     # Optional: Add to context menu (right-click menu)
     UI.add_context_menu_handler do |context_menu|

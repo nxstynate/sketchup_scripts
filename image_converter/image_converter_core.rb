@@ -283,6 +283,75 @@ module ImageToGeometryConverter
     return count
   end
   
+  def self.run_diagnostics
+    model = Sketchup.active_model
+    puts "Starting model diagnostics..."
+    
+    # Clear any existing edit contexts first
+    while model.active_path && model.active_path.length > 0
+      model.close_active
+    end
+    
+    diagnostics_results = {
+      images: 0,
+      faces_with_textures: 0,
+      groups: 0,
+      components: 0,
+      other_entities: 0
+    }
+    
+    run_diagnostics_on_entities(model.entities, [], diagnostics_results)
+    
+    # Make sure we're back to the root context
+    while model.active_path && model.active_path.length > 0
+      model.close_active
+    end
+    
+    puts "Diagnostics complete."
+    UI.messagebox("Diagnostics complete. Check the Ruby Console for details.")
+  end
+
+  def self.run_diagnostics_on_entities(entities, context_path, results)
+    model = Sketchup.active_model
+    context_desc = context_path.empty? ? "Root" : context_path.join(" > ")
+
+    entities.each do |entity|
+      if entity.is_a?(Sketchup::Image)
+        results[:images] += 1
+        puts "Found Sketchup::Image: '#{entity.name || 'Unnamed'}' in context: #{context_desc}"
+      elsif entity.is_a?(Sketchup::Face) && entity.material && entity.material.texture
+        results[:faces_with_textures] += 1
+        puts "Found Sketchup::Face with texture: '#{entity.material.name}' in context: #{context_desc}"
+      elsif entity.is_a?(Sketchup::Group)
+        results[:groups] += 1
+        group_name = entity.name || "Unnamed Group"
+        begin
+          model.edit_entity(entity)
+          new_context_path = context_path + [group_name]
+          run_diagnostics_on_entities(entity.entities, new_context_path, results)
+          model.close_active
+        rescue => e
+          puts "Error accessing group '#{group_name}': #{e.message}"
+          model.close_active rescue nil
+        end
+      elsif entity.is_a?(Sketchup::ComponentInstance)
+        results[:components] += 1
+        comp_name = entity.definition.name || "Unnamed Component"
+        begin
+          model.edit_entity(entity)
+          new_context_path = context_path + [comp_name]
+          run_diagnostics_on_entities(entity.definition.entities, new_context_path, results)
+          model.close_active
+        rescue => e
+          puts "Error accessing component '#{comp_name}': #{e.message}"
+          model.close_active rescue nil
+        end
+      else
+        results[:other_entities] += 1
+      end
+    end
+  end
+
   # Debug method to show current edit context
   def self.debug_context
     model = Sketchup.active_model
