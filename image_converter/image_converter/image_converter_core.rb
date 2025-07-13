@@ -11,19 +11,7 @@ module ImageToGeometryConverter
 
     # --- New Feedback Logic ---
     # 1. First, get a total count of images for the progress bar
-    total_images = 0
-    count_proc = lambda do |entities|
-      entities.each do |entity|
-        if entity.is_a?(Sketchup::Image)
-          total_images += 1
-        elsif entity.is_a?(Sketchup::Group)
-          count_proc.call(entity.entities)
-        elsif entity.is_a?(Sketchup::ComponentInstance)
-          count_proc.call(entity.definition.entities)
-        end
-      end
-    end
-    count_proc.call(model.entities)
+    total_images = _count_images_recursive(model.entities)
 
     if total_images == 0
       UI.messagebox("No Image entities found to convert.")
@@ -55,23 +43,7 @@ module ImageToGeometryConverter
 
   def self.count_images
     model = Sketchup.active_model
-    count = 0
-
-    # Use a simple recursive proc for read-only counting
-    proc = lambda do |entities_collection|
-      entities_collection.each do |entity|
-        if entity.is_a?(Sketchup::Image)
-          count += 1
-        elsif entity.is_a?(Sketchup::Group)
-          proc.call(entity.entities)
-        elsif entity.is_a?(Sketchup::ComponentInstance)
-          proc.call(entity.definition.entities)
-        end
-      end
-    end
-
-    proc.call(model.entities)
-
+    count = _count_images_recursive(model.entities)
     UI.messagebox("Found #{count} Image entit#{count == 1 ? 'y' : 'ies'} in the model.")
   end
 
@@ -114,6 +86,20 @@ module ImageToGeometryConverter
   # --- Private Methods ---
 
   private
+
+  def self._count_images_recursive(entities)
+    count = 0
+    entities.each do |entity|
+      if entity.is_a?(Sketchup::Image)
+        count += 1
+      elsif entity.is_a?(Sketchup::Group)
+        count += _count_images_recursive(entity.entities)
+      elsif entity.is_a?(Sketchup::ComponentInstance)
+        count += _count_images_recursive(entity.definition.entities)
+      end
+    end
+    count
+  end
 
   # Recursively processes a context, now with feedback parameters
   def self.process_context(path, count, total_images)
